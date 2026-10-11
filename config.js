@@ -1,10 +1,8 @@
-// إعدادات الاتصال بـ Supabase
-// من Supabase: Project Settings → API (أو Data API)
-//   SUPABASE_URL      = Project URL
-//   SUPABASE_ANON_KEY = المفتاح العام (anon / publishable) — مسموح يتحط هنا
+// إعدادات الاتصال بـ Supabase — مشروع ikaf-follow
+// المفتاح ده هو المفتاح العام (publishable) ومسموح يتحط هنا
 // ⚠️ ممنوع تحط هنا مفتاح service_role أو secret أبدًا
 window.APP_CONFIG = {
-  SUPABASE_URL: "https://YOUR-PROJECT.supabase.co",
-  SUPABASE_ANON_KEY: "YOUR-ANON-KEY",
+  SUPABASE_URL: "https://gthlnthuamlsszsulyqc.supabase.co",
+  SUPABASE_ANON_KEY: "sb_publishable_I6qwml2e15c1i9F4YxoG7A_dhkx3Cq1",
   EMAIL_DOMAIN: "ikaf.example.com"
 };
