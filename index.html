@@ -1,0 +1,652 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>متابعة المعاملات — إكاف</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#1B2733; --ink-2:#4A5866; --ink-3:#7B8794;
+  --paper:#F3F5F6; --card:#FFFFFF; --line:#DDE2E6;
+  --indigo:#23407A; --indigo-soft:#E7ECF6;
+  --wait:#B7791F; --wait-soft:#FBF1DE;
+  --late:#B3261E; --late-soft:#FBE7E5;
+  --ok:#2D6A4F;  --ok-soft:#E3F1EA;
+  --r:10px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--paper);color:var(--ink);font-family:"IBM Plex Sans Arabic",system-ui,sans-serif;font-size:15px;line-height:1.6}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--indigo);outline-offset:2px}
+.hide{display:none!important}
+.wrap{max-width:1040px;margin:0 auto;padding:0 16px}
+
+/* ---------- الدخول ---------- */
+.auth{min-height:100vh;display:grid;place-items:center;padding:24px 16px}
+.auth-box{width:100%;max-width:380px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:28px}
+.auth-box h1{font-size:22px;margin:0 0 4px}
+.auth-box p{margin:0 0 20px;color:var(--ink-2)}
+label{display:block;font-weight:500;margin:14px 0 6px;font-size:14px}
+input,select,textarea{width:100%;border:1px solid var(--line);background:#fff;border-radius:8px;padding:10px 12px}
+textarea{min-height:90px;resize:vertical}
+input[dir=ltr]{text-align:right}
+.btn{border:0;border-radius:8px;padding:10px 16px;font-weight:600;cursor:pointer;background:var(--indigo);color:#fff;white-space:nowrap}
+.btn:disabled{opacity:.5;cursor:default}
+.btn.ghost{background:transparent;color:var(--indigo);border:1px solid var(--line)}
+.btn.ok{background:var(--ok)} .btn.danger{background:var(--late)} .btn.warn{background:var(--wait)}
+.btn.block{width:100%;margin-top:20px}
+.err{color:var(--late);font-size:14px;margin-top:10px;min-height:1em}
+
+/* ---------- الشريط العلوي ---------- */
+header.top{background:var(--ink);color:#fff;position:sticky;top:0;z-index:20}
+header.top .wrap{display:flex;align-items:center;gap:12px;height:58px}
+.brand{font-weight:700;font-size:17px}
+.brand small{font-weight:400;opacity:.7;margin-inline-start:6px;font-size:13px}
+.spacer{flex:1}
+.who{font-size:13px;opacity:.85;text-align:left;line-height:1.3}
+.icon-btn{position:relative;background:transparent;border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:8px;height:36px;min-width:36px;padding:0 10px;cursor:pointer}
+.badge{position:absolute;top:-6px;left:-6px;background:var(--late);color:#fff;border-radius:10px;font-size:11px;min-width:18px;height:18px;line-height:18px;padding:0 4px;text-align:center}
+
+nav.tabs{display:flex;gap:4px;overflow-x:auto;margin:18px 0 14px;border-bottom:1px solid var(--line)}
+nav.tabs button{background:none;border:0;padding:10px 14px;cursor:pointer;color:var(--ink-2);font-weight:500;border-bottom:3px solid transparent;white-space:nowrap}
+nav.tabs button.on{color:var(--ink);border-bottom-color:var(--indigo)}
+nav.tabs .count{display:inline-block;background:var(--indigo-soft);color:var(--indigo);border-radius:10px;padding:0 7px;font-size:12px;margin-inline-start:6px}
+
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.toolbar input,.toolbar select{width:auto;flex:1;min-width:140px}
+.toolbar .btn{flex:none}
+
+/* ---------- المعاملة في القائمة: اللي ماسكها هو العنصر الأساسي ---------- */
+.list{display:flex;flex-direction:column;gap:8px;padding-bottom:40px}
+.row{display:grid;grid-template-columns:1fr auto;gap:6px 16px;background:var(--card);border:1px solid var(--line);border-inline-start:4px solid var(--indigo);border-radius:var(--r);padding:12px 14px;cursor:pointer;text-align:right;width:100%}
+.row:hover{border-color:#B9C3CC}
+.row.s-wait{border-inline-start-color:var(--wait)}
+.row.s-late{border-inline-start-color:var(--late)}
+.row.s-ok{border-inline-start-color:var(--ok)}
+.row.s-off{border-inline-start-color:var(--ink-3);opacity:.8}
+.row .t{font-weight:600}
+.row .meta{color:var(--ink-3);font-size:13px}
+.holder{text-align:left;min-width:120px}
+.holder .name{font-weight:700;font-size:16px}
+.holder .since{font-size:12px;color:var(--ink-3)}
+.holder.late .since{color:var(--late);font-weight:600}
+.chip{display:inline-block;font-size:12px;border-radius:6px;padding:1px 8px;margin-inline-end:6px;background:var(--indigo-soft);color:var(--indigo)}
+.chip.wait{background:var(--wait-soft);color:var(--wait)}
+.chip.late{background:var(--late-soft);color:var(--late)}
+.chip.ok{background:var(--ok-soft);color:var(--ok)}
+.chip.off{background:#ECEFF1;color:var(--ink-2)}
+.empty{text-align:center;color:var(--ink-2);padding:48px 16px;background:var(--card);border:1px dashed var(--line);border-radius:var(--r)}
+
+/* ---------- لوحات ---------- */
+.panel-bg{position:fixed;inset:0;background:rgba(27,39,51,.45);z-index:40;display:flex;justify-content:flex-start}
+.panel{background:var(--paper);width:100%;max-width:620px;height:100%;overflow-y:auto;box-shadow:0 0 40px rgba(0,0,0,.2)}
+.panel-head{position:sticky;top:0;background:var(--card);border-bottom:1px solid var(--line);padding:14px 18px;display:flex;align-items:center;gap:10px;z-index:2}
+.panel-head h2{font-size:17px;margin:0;flex:1}
+.panel-body{padding:18px}
+.close-x{background:none;border:0;font-size:22px;cursor:pointer;color:var(--ink-2);line-height:1}
+
+.box{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;margin-bottom:12px}
+.box h3{font-size:14px;margin:0 0 10px;color:var(--ink-2);font-weight:600}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:14px}
+.kv dt{color:var(--ink-3)} .kv dd{margin:0}
+.desc{white-space:pre-wrap}
+
+/* مراحل المعاملة (تسلسل حقيقي فاستخدام الترقيم مقصود) */
+.steps{display:flex;gap:0;margin:2px 0 4px;counter-reset:s}
+.step{flex:1;text-align:center;font-size:12px;color:var(--ink-3);position:relative;padding-top:30px}
+.step::before{counter-increment:s;content:counter(s);position:absolute;top:0;right:50%;transform:translateX(50%);width:24px;height:24px;border-radius:50%;background:#fff;border:2px solid var(--line);line-height:20px;font-weight:600;color:var(--ink-3);z-index:1}
+.step::after{content:"";position:absolute;top:11px;right:50%;width:100%;height:2px;background:var(--line)}
+.step:last-child::after{display:none}
+.step.done{color:var(--ok)} .step.done::before{background:var(--ok);border-color:var(--ok);color:#fff;content:"✓"}
+.step.done::after{background:var(--ok)}
+.step.now{color:var(--ink);font-weight:600} .step.now::before{border-color:var(--indigo);color:var(--indigo)}
+
+.holder-big{display:flex;align-items:center;gap:14px;background:var(--ink);color:#fff;border-radius:var(--r);padding:14px 16px;margin-bottom:12px}
+.holder-big .lbl{font-size:13px;opacity:.75}
+.holder-big .nm{font-size:20px;font-weight:700;line-height:1.3}
+.holder-big .days{margin-inline-start:auto;text-align:center;line-height:1.1}
+.holder-big .days b{font-size:28px;display:block}
+.holder-big.late{background:var(--late)}
+.holder-big.ok{background:var(--ok)}
+
+.actions{display:flex;flex-wrap:wrap;gap:8px}
+.timeline{list-style:none;margin:0;padding:0}
+.timeline li{padding:8px 0;border-bottom:1px solid var(--line);font-size:14px}
+.timeline li:last-child{border-bottom:0}
+.timeline .when{color:var(--ink-3);font-size:12px}
+.timeline .note{background:var(--paper);border-radius:6px;padding:6px 10px;margin-top:4px;white-space:pre-wrap}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+.hint{font-size:13px;color:var(--ink-3);margin-top:4px}
+
+/* إشعارات */
+.notif{display:block;width:100%;text-align:right;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:6px;cursor:pointer}
+.notif.unread{border-inline-start:4px solid var(--indigo);font-weight:500}
+.notif .when{color:var(--ink-3);font-size:12px;display:block}
+
+/* لوحة المتابعة */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px}
+.stat b{font-size:26px;display:block;line-height:1.2}
+.stat span{font-size:13px;color:var(--ink-2)}
+.stat.late b{color:var(--late)} .stat.wait b{color:var(--wait)}
+table.t{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;font-size:14px}
+table.t th,table.t td{padding:9px 12px;text-align:right;border-bottom:1px solid var(--line)}
+table.t th{background:#F8F9FA;color:var(--ink-2);font-weight:600;font-size:13px}
+.bar{height:8px;background:var(--line);border-radius:4px;overflow:hidden;min-width:60px}
+.bar i{display:block;height:100%;background:var(--indigo)}
+
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:8px;z-index:60;font-size:14px;max-width:90vw}
+.toast.bad{background:var(--late)}
+
+@media (max-width:640px){
+  .row{grid-template-columns:1fr}
+  .holder{text-align:right;display:flex;gap:10px;align-items:baseline}
+  .stats{grid-template-columns:1fr 1fr}
+  .grid2{grid-template-columns:1fr}
+  .who{display:none}
+  .step{font-size:11px}
+  .panel{max-width:none}
+}
+@media (prefers-reduced-motion:no-preference){
+  .panel{animation:slide .18s ease-out}
+  @keyframes slide{from{transform:translateX(-24px);opacity:.6}to{transform:none;opacity:1}}
+}
+</style>
+</head>
+<body>
+
+<!-- ========== الدخول ========== -->
+<section id="v-login" class="auth hide">
+  <form class="auth-box" id="f-login">
+    <h1>متابعة المعاملات</h1>
+    <p>ادخل بكود الشغل بتاعك</p>
+    <label for="l-code">كود الموظف</label>
+    <input id="l-code" dir="ltr" autocomplete="username" placeholder="SA04" required>
+    <label for="l-pass">كلمة المرور</label>
+    <input id="l-pass" type="password" dir="ltr" autocomplete="current-password" required>
+    <button class="btn block" id="b-login">دخول</button>
+    <div class="err" id="e-login"></div>
+  </form>
+</section>
+
+<!-- ========== تغيير كلمة المرور ========== -->
+<section id="v-pass" class="auth hide">
+  <form class="auth-box" id="f-pass">
+    <h1>غيّر كلمة المرور</h1>
+    <p>أول مرة تدخل — اختار كلمة مرور خاصة بيك (8 حروف على الأقل)</p>
+    <label for="p1">كلمة المرور الجديدة</label>
+    <input id="p1" type="password" dir="ltr" autocomplete="new-password" minlength="8" required>
+    <label for="p2">اكتبها تاني</label>
+    <input id="p2" type="password" dir="ltr" autocomplete="new-password" minlength="8" required>
+    <button class="btn block">حفظ ومتابعة</button>
+    <div class="err" id="e-pass"></div>
+  </form>
+</section>
+
+<!-- ========== التطبيق ========== -->
+<section id="v-app" class="hide">
+  <header class="top">
+    <div class="wrap">
+      <div class="brand">إكاف<small>متابعة المعاملات</small></div>
+      <div class="spacer"></div>
+      <div class="who" id="who"></div>
+      <button class="icon-btn" id="b-notif" aria-label="التنبيهات">🔔<span class="badge hide" id="n-badge"></span></button>
+      <button class="icon-btn" id="b-logout">خروج</button>
+    </div>
+  </header>
+  <div class="wrap">
+    <nav class="tabs" id="tabs"></nav>
+    <div id="main"></div>
+  </div>
+</section>
+
+<div id="layer"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script>
+(() => {
+const C = window.APP_CONFIG;
+const sb = supabase.createClient(C.SUPABASE_URL, C.SUPABASE_ANON_KEY);
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+const STATUS = {
+  pending_approval: ["بانتظار الموافقة","wait"],
+  pending_routing:  ["بانتظار التوجيه","wait"],
+  in_progress:      ["قيد التنفيذ",""],
+  needs_info:       ["محتاجة استيضاح","wait"],
+  returned:         ["مرتجعة","late"],
+  done:             ["اتنفذت — بانتظار تأكيد المنشئ","wait"],
+  closed:           ["مقفولة","ok"],
+  rejected:         ["مرفوضة","off"],
+  cancelled:        ["ملغاة","off"]
+};
+const OPEN = s => !["closed","rejected","cancelled"].includes(s);
+const PRIORITY = { normal:"عادية", urgent:"عاجلة", critical:"عاجلة جدًا" };
+const ACTION = {
+  create:"أنشأ المعاملة", approve:"وافق", reject:"رفض", to_routing:"اتحولت لسلاسل التوجيه",
+  to_assignee:"اتحولت للمنفذ", route:"وجّهها", reassign:"أعاد التوجيه", request_info:"طلب استيضاح",
+  provide_info:"رد على الاستيضاح", done:"ضغط تم التنفيذ", close:"أكد وقفل المعاملة",
+  return:"رجّعها للمنفذ", cancel:"ألغاها", comment:"علّق", remind:"بعت تذكير ⏰"
+};
+
+let S = { me:null, emps:{}, depts:{}, types:{}, txns:[], notifs:[], tab:"mine", filter:{q:"",st:"open",dept:""} };
+
+/* ---------- أدوات ---------- */
+const fmtDate = d => d ? new Date(d).toLocaleDateString("ar-EG-u-nu-latn",{day:"numeric",month:"short"}) : "";
+const fmtDT = d => new Date(d).toLocaleString("ar-EG-u-nu-latn",{day:"numeric",month:"short",hour:"numeric",minute:"2-digit"});
+const daysSince = d => Math.floor((Date.now() - new Date(d)) / 86400000);
+const today = () => { const t = new Date(); t.setHours(0,0,0,0); return t; };
+const isLate = t => OPEN(t.status) && t.status !== "done" && t.due_date && new Date(t.due_date + "T00:00:00") < today();
+const empName = c => c ? (S.emps[c]?.name || c) : "";
+const deptName = c => c ? (S.depts[c]?.name || c) : "";
+const isRouter = dept => S.me.role === "chairman" || (["manager","deputy"].includes(S.me.role) && S.me.dept === dept);
+const isBoss = () => ["manager","deputy","chairman"].includes(S.me.role);
+
+function toast(msg, bad){
+  const el = document.createElement("div");
+  el.className = "toast" + (bad ? " bad" : ""); el.textContent = msg;
+  document.body.appendChild(el); setTimeout(() => el.remove(), 3500);
+}
+function errText(e){
+  const m = e?.message || String(e);
+  if (/Invalid login/i.test(m)) return "الكود أو كلمة المرور غلط";
+  if (/Failed to fetch|NetworkError/i.test(m)) return "مفيش اتصال بالإنترنت أو السيرفر";
+  return m;
+}
+async function rpc(fn, args){
+  const { data, error } = await sb.rpc(fn, args);
+  if (error) throw error;
+  return data;
+}
+function show(id){ ["v-login","v-pass","v-app"].forEach(v => $("#"+v).classList.toggle("hide", v !== id)); }
+
+function holderLabel(t){
+  if (!OPEN(t.status)) return { name: STATUS[t.status][0], sub: fmtDate(t.closed_at) };
+  if (!t.holder) return { name: "مدير/نائب " + deptName(t.holder_dept), sub: "" };
+  return { name: empName(t.holder), sub: deptName(t.holder_dept) };
+}
+function rowClass(t){
+  if (!OPEN(t.status)) return t.status === "closed" ? "s-ok" : "s-off";
+  if (isLate(t) || t.status === "returned") return "s-late";
+  return STATUS[t.status][1] === "wait" ? "s-wait" : "";
+}
+function waitingOnMe(t){
+  if (!OPEN(t.status)) return false;
+  if (t.holder === S.me.code) return true;
+  return !t.holder && t.status === "pending_routing" && isRouter(t.holder_dept);
+}
+
+/* ---------- الدخول ---------- */
+$("#f-login").addEventListener("submit", async e => {
+  e.preventDefault();
+  const code = $("#l-code").value.trim().toLowerCase();
+  $("#e-login").textContent = ""; $("#b-login").disabled = true;
+  try {
+    const { error } = await sb.auth.signInWithPassword({ email: code + "@" + C.EMAIL_DOMAIN, password: $("#l-pass").value });
+    if (error) throw error;
+    await boot();
+  } catch (err) { $("#e-login").textContent = errText(err); }
+  $("#b-login").disabled = false;
+});
+
+$("#f-pass").addEventListener("submit", async e => {
+  e.preventDefault();
+  const a = $("#p1").value, b = $("#p2").value;
+  if (a !== b) { $("#e-pass").textContent = "كلمتين المرور مش زي بعض"; return; }
+  if (a.length < 8) { $("#e-pass").textContent = "8 حروف على الأقل"; return; }
+  try {
+    const { error } = await sb.auth.updateUser({ password: a });
+    if (error) throw error;
+    await rpc("password_changed");
+    toast("اتغيرت كلمة المرور");
+    await boot();
+  } catch (err) { $("#e-pass").textContent = errText(err); }
+});
+
+$("#b-logout").addEventListener("click", async () => { await sb.auth.signOut(); location.reload(); });
+
+/* ---------- تحميل البيانات ---------- */
+async function boot(){
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { show("v-login"); return; }
+  const me = await rpc("my_emp");
+  if (!me || !me.code) { await sb.auth.signOut(); show("v-login"); $("#e-login").textContent = "الحساب ده مش مربوط بموظف — كلم المسؤول"; return; }
+  S.me = me;
+  if (me.must_change_password) { show("v-pass"); return; }
+  const [emps, depts, types] = await Promise.all([
+    sb.from("employees").select("code,name,title,dept,role,active").order("code"),
+    sb.from("departments").select("*").order("sort"),
+    sb.from("txn_types").select("*").eq("active", true).order("sort")
+  ]);
+  S.emps = Object.fromEntries((emps.data||[]).map(x => [x.code, x]));
+  S.depts = Object.fromEntries((depts.data||[]).map(x => [x.code, x]));
+  S.types = Object.fromEntries((types.data||[]).map(x => [x.code, x]));
+  $("#who").innerHTML = `${esc(me.name)} — ${esc(me.code)}<br>${esc(me.title||"")} · ${esc(deptName(me.dept))}`;
+  show("v-app");
+  await refresh();
+  if (!S.poll) S.poll = setInterval(() => { if (!document.hidden) refresh(true); }, 45000);
+  const id = new URLSearchParams(location.hash.slice(1)).get("t");
+  if (id) openTxn(+id);
+}
+
+async function refresh(silent){
+  const [t, n] = await Promise.all([
+    sb.from("transactions").select("*").order("id", { ascending: false }).limit(1000),
+    sb.from("notifications").select("*").order("id", { ascending: false }).limit(60)
+  ]);
+  if (t.error) { if (!silent) toast(errText(t.error), true); return; }
+  S.txns = t.data || []; S.notifs = n.data || [];
+  const unread = S.notifs.filter(x => !x.is_read).length;
+  $("#n-badge").textContent = unread; $("#n-badge").classList.toggle("hide", !unread);
+  render();
+}
+
+/* ---------- العرض ---------- */
+function tabs(){
+  const mine = S.txns.filter(waitingOnMe).length;
+  const list = [["mine","مستنياك", mine],["created","أنشأتها"],["all","كل المعاملات"]];
+  if (isBoss()) list.push(["board","لوحة المتابعة"]);
+  $("#tabs").innerHTML = list.map(([k,l,c]) =>
+    `<button class="${S.tab===k?"on":""}" data-tab="${k}">${l}${c!=null?`<span class="count">${c}</span>`:""}</button>`).join("");
+  $("#tabs").querySelectorAll("button").forEach(b => b.onclick = () => { S.tab = b.dataset.tab; render(); });
+}
+
+function rowHTML(t){
+  const h = holderLabel(t), late = isLate(t), st = STATUS[t.status];
+  const days = OPEN(t.status) ? daysSince(t.holder_since) : null;
+  return `<button class="row ${rowClass(t)}" data-id="${t.id}">
+    <div>
+      <div class="t">#${t.id} — ${esc(t.title)}</div>
+      <div class="meta">
+        <span class="chip ${st[1]}">${st[0]}</span>${late?`<span class="chip late">متأخرة</span>`:""}${t.priority!=="normal"?`<span class="chip late">${PRIORITY[t.priority]}</span>`:""}
+        ${esc(S.types[t.type_code]?.name||t.type_code)} · من ${esc(empName(t.creator))}${t.due_date?` · الاستحقاق ${fmtDate(t.due_date)}`:""}
+      </div>
+    </div>
+    <div class="holder ${late?"late":""}">
+      <div class="name">${esc(h.name)}</div>
+      <div class="since">${days!=null ? (days===0?"من النهارده":`واقفة عنده من ${days} يوم`) : esc(h.sub)}</div>
+    </div>
+  </button>`;
+}
+
+function listView(items, emptyMsg){
+  return items.length ? `<div class="list">${items.map(rowHTML).join("")}</div>` : `<div class="empty">${emptyMsg}</div>`;
+}
+
+function render(){
+  tabs();
+  const main = $("#main");
+  const newBtn = `<button class="btn" id="b-new">+ معاملة جديدة</button>`;
+  if (S.tab === "mine"){
+    const items = S.txns.filter(waitingOnMe).sort((a,b) => new Date(a.holder_since) - new Date(b.holder_since));
+    main.innerHTML = `<div class="toolbar"><div class="spacer"></div>${newBtn}</div>` +
+      listView(items, "مفيش حاجة مستنياك دلوقتي. لو محتاج حاجة من إدارة تانية اضغط «معاملة جديدة».");
+  } else if (S.tab === "created"){
+    const items = S.txns.filter(t => t.creator === S.me.code);
+    main.innerHTML = `<div class="toolbar"><div class="spacer"></div>${newBtn}</div>` +
+      listView(items, "لسه ما أنشأتش معاملات.");
+  } else if (S.tab === "all"){
+    const f = S.filter;
+    const items = S.txns.filter(t =>
+      (f.st === "all" || (f.st === "open" ? OPEN(t.status) : f.st === "late" ? isLate(t) : !OPEN(t.status))) &&
+      (!f.dept || t.holder_dept === f.dept || t.creator_dept === f.dept || t.target_dept === f.dept) &&
+      (!f.q || (`#${t.id} ${t.title} ${t.details||""} ${empName(t.creator)} ${empName(t.holder)} ${empName(t.assignee)}`).includes(f.q)));
+    main.innerHTML = `<div class="toolbar">
+        <input id="q" placeholder="بحث برقم أو عنوان أو اسم" value="${esc(f.q)}">
+        <select id="fs">
+          <option value="open">المفتوحة</option><option value="late">المتأخرة</option>
+          <option value="closed">المقفولة</option><option value="all">الكل</option>
+        </select>
+        <select id="fd"><option value="">كل الإدارات</option>${Object.values(S.depts).map(d=>`<option value="${d.code}">${esc(d.name)}</option>`).join("")}</select>
+        ${newBtn}
+      </div>` + listView(items, "مفيش معاملات بالفلتر ده.");
+    $("#fs").value = f.st; $("#fd").value = f.dept;
+    $("#q").oninput = e => { f.q = e.target.value; const p = e.target.selectionStart; render(); $("#q").focus(); $("#q").setSelectionRange(p,p); };
+    $("#fs").onchange = e => { f.st = e.target.value; render(); };
+    $("#fd").onchange = e => { f.dept = e.target.value; render(); };
+  } else if (S.tab === "board"){
+    main.innerHTML = boardHTML();
+  }
+  main.querySelectorAll(".row").forEach(r => r.onclick = () => openTxn(+r.dataset.id));
+  const nb = $("#b-new"); if (nb) nb.onclick = openNew;
+}
+
+function boardHTML(){
+  const open = S.txns.filter(t => OPEN(t.status));
+  const late = open.filter(isLate);
+  const confirm = open.filter(t => t.status === "done");
+  const closed = S.txns.filter(t => t.status === "closed" && t.closed_at);
+  const avg = closed.length ? (closed.reduce((s,t) => s + (new Date(t.closed_at) - new Date(t.created_at)), 0) / closed.length / 86400000) : null;
+  const byDept = {};
+  open.forEach(t => {
+    const d = t.holder_dept || "—";
+    byDept[d] = byDept[d] || { n:0, late:0, age:0 };
+    byDept[d].n++; if (isLate(t)) byDept[d].late++;
+    byDept[d].age = Math.max(byDept[d].age, daysSince(t.holder_since));
+  });
+  const max = Math.max(1, ...Object.values(byDept).map(x => x.n));
+  const oldest = [...open].sort((a,b) => new Date(a.holder_since) - new Date(b.holder_since)).slice(0, 8);
+  return `<div class="stats">
+      <div class="stat"><b>${open.length}</b><span>معاملة مفتوحة</span></div>
+      <div class="stat late"><b>${late.length}</b><span>متأخرة عن الاستحقاق</span></div>
+      <div class="stat wait"><b>${confirm.length}</b><span>اتنفذت ومستنية تأكيد</span></div>
+      <div class="stat"><b>${avg==null?"—":avg.toFixed(1)}</b><span>متوسط أيام القفل</span></div>
+    </div>
+    <div class="box"><h3>المعاملات المفتوحة واقفة عند أنهي إدارة</h3>
+      <table class="t"><thead><tr><th>الإدارة</th><th>مفتوحة</th><th>متأخرة</th><th>أقدم واحدة واقفة من</th><th></th></tr></thead><tbody>
+      ${Object.entries(byDept).sort((a,b)=>b[1].n-a[1].n).map(([d,x]) => `<tr><td>${esc(deptName(d))}</td><td>${x.n}</td><td>${x.late}</td><td>${x.age} يوم</td><td><div class="bar"><i style="width:${Math.round(x.n/max*100)}%"></i></div></td></tr>`).join("") || `<tr><td colspan="5">مفيش معاملات مفتوحة</td></tr>`}
+      </tbody></table>
+    </div>
+    ${oldest.length ? `<h3 style="font-size:14px;color:var(--ink-2);margin:18px 0 8px">أقدم المعاملات اللي لسه مفتوحة</h3>${listView(oldest, "")}` : ""}`;
+}
+
+/* ---------- لوحة جانبية ---------- */
+function panel(title, body, onReady){
+  $("#layer").innerHTML = `<div class="panel-bg" id="pbg"><aside class="panel" role="dialog" aria-label="${esc(title)}">
+    <div class="panel-head"><h2>${esc(title)}</h2><button class="close-x" id="px" aria-label="إغلاق">×</button></div>
+    <div class="panel-body">${body}</div></aside></div>`;
+  const close = () => { $("#layer").innerHTML = ""; history.replaceState(null, "", location.pathname); document.removeEventListener("keydown", onEsc); };
+  const onEsc = e => { if (e.key === "Escape") close(); };
+  document.addEventListener("keydown", onEsc);
+  $("#px").onclick = close;
+  $("#pbg").onclick = e => { if (e.target.id === "pbg") close(); };
+  onReady && onReady(close);
+}
+
+/* ---------- معاملة جديدة ---------- */
+function openNew(){
+  const types = Object.values(S.types).filter(t => !t.allowed_creator_depts || t.allowed_creator_depts.includes(S.me.dept));
+  const managers = Object.values(S.emps).filter(e => e.active && e.role === "manager" && e.dept === S.me.dept && e.code !== S.me.code);
+  const others = Object.values(S.emps).filter(e => e.active && e.code !== S.me.code);
+  const groups = Object.values(S.depts).map(d => {
+    const es = others.filter(e => e.dept === d.code);
+    return es.length ? `<optgroup label="${esc(d.name)}">${es.map(e => `<option value="${e.code}">${esc(e.name)} — ${esc(e.title||"")} (${e.code})</option>`).join("")}</optgroup>` : "";
+  }).join("");
+  const body = `<form id="f-new">
+    <label for="n-type">نوع المعاملة</label>
+    <select id="n-type">${types.map(t => `<option value="${t.code}">${esc(t.name)}</option>`).join("")}</select>
+    <div class="hint" id="n-flow"></div>
+    <label for="n-title">العنوان</label>
+    <input id="n-title" required maxlength="140" placeholder="مثلًا: تحويل 40 درزن جلابية لمستودع المندوب">
+    <div id="n-transfer" class="grid2">
+      <div><label for="n-from">من مستودع</label><input id="n-from" placeholder="مستودع الرياض الرئيسي"></div>
+      <div><label for="n-to">إلى مستودع المندوب</label><input id="n-to" placeholder="مستودع المندوب ..."></div>
+    </div>
+    <label for="n-details">التفاصيل</label>
+    <textarea id="n-details" placeholder="الأصناف والكميات، أو أي تفاصيل يحتاجها المنفذ"></textarea>
+    <div class="grid2">
+      <div><label for="n-pr">الأولوية</label><select id="n-pr"><option value="normal">عادية</option><option value="urgent">عاجلة</option><option value="critical">عاجلة جدًا</option></select></div>
+      <div><label for="n-due">مطلوبة قبل يوم</label><input id="n-due" type="date"></div>
+    </div>
+    <div id="n-ap-w"><label for="n-ap">يوافق عليها</label>
+      <select id="n-ap">${managers.map(e => `<option value="${e.code}">${esc(e.name)} — ${esc(e.title||"")}</option>`).join("")}</select></div>
+    <div id="n-as-w"><label for="n-as">مطلوب تنفيذها من</label>
+      <select id="n-as"><option value="">اختار الموظف</option>${groups}</select></div>
+    <button class="btn block" id="n-go">إنشاء المعاملة</button>
+    <div class="err" id="n-err"></div>
+  </form>`;
+  panel("معاملة جديدة", body, close => {
+    const sync = () => {
+      const ty = S.types[$("#n-type").value];
+      const needAp = ty.requires_approval && !["manager","chairman"].includes(S.me.role);
+      $("#n-transfer").classList.toggle("hide", ty.code !== "transfer");
+      $("#n-ap-w").classList.toggle("hide", !needAp);
+      $("#n-as-w").classList.toggle("hide", !!ty.fixed_target_dept);
+      const flow = ["إنت تنشئها"];
+      if (needAp) flow.push("مدير إدارتك يوافق");
+      if (ty.requires_routing) flow.push(`مدير/نائب ${deptName(ty.fixed_target_dept)} يوجّهها لموظف`);
+      flow.push("المنفذ يضغط تم التنفيذ", "إنت تأكد وتقفلها");
+      $("#n-flow").textContent = flow.join(" ← ");
+    };
+    $("#n-type").onchange = sync; sync();
+    $("#f-new").onsubmit = async e => {
+      e.preventDefault();
+      const ty = S.types[$("#n-type").value];
+      const extra = ty.code === "transfer" ? { from_wh: $("#n-from").value.trim(), to_wh: $("#n-to").value.trim() } : {};
+      $("#n-go").disabled = true; $("#n-err").textContent = "";
+      try {
+        const id = await rpc("create_txn", {
+          p_type: ty.code, p_title: $("#n-title").value, p_details: $("#n-details").value, p_extra: extra,
+          p_priority: $("#n-pr").value, p_due: $("#n-due").value || null,
+          p_approver: $("#n-ap").value || null, p_assignee: $("#n-as").value || null });
+        toast(`اتنشأت المعاملة #${id}`); close(); S.tab = "created"; await refresh(); openTxn(id);
+      } catch (err) { $("#n-err").textContent = errText(err); $("#n-go").disabled = false; }
+    };
+  });
+}
+
+/* ---------- تفاصيل المعاملة ---------- */
+function stepsFor(t){
+  const ty = S.types[t.type_code] || {};
+  const st = [["create","الإنشاء"]];
+  if (ty.requires_approval) st.push(["approve","الموافقة"]);
+  if (ty.requires_routing) st.push(["route","التوجيه"]);
+  st.push(["exec","التنفيذ"], ["confirm","تأكيد المنشئ"]);
+  const s = t.status === "needs_info" ? t.prev_status : t.status;
+  const pos = { pending_approval:"approve", pending_routing:"route", in_progress:"exec", returned:"exec", done:"confirm" }[s];
+  let idx = pos ? st.findIndex(x => x[0] === pos) : (t.status === "closed" ? st.length : -1);
+  return `<div class="steps">${st.map((x,i) => `<div class="step ${idx<0?"":i<idx?"done":i===idx?"now":""}">${x[1]}</div>`).join("")}</div>`;
+}
+
+async function openTxn(id){
+  let t = S.txns.find(x => x.id === id);
+  if (!t) { const r = await sb.from("transactions").select("*").eq("id", id).maybeSingle(); t = r.data; }
+  if (!t) { toast("المعاملة مش موجودة أو مش مسموح لك تشوفها", true); return; }
+  history.replaceState(null, "", "#t=" + id);
+  const ev = (await sb.from("txn_events").select("*").eq("txn_id", id).order("id")).data || [];
+  const h = holderLabel(t), late = isLate(t), days = daysSince(t.holder_since), me = S.me.code;
+  const ty = S.types[t.type_code] || {};
+
+  // الإجراءات المتاحة
+  const A = [];
+  const open = OPEN(t.status);
+  if (t.status === "pending_approval" && t.holder === me){ A.push(["approve_txn","موافقة","ok"],["reject_txn","رفض","danger",true],["request_info","طلب استيضاح","ghost",true]); }
+  if (t.status === "pending_routing" && isRouter(t.target_dept)){ A.push(["route","توجيه لموظف",""],["reject_txn","رفض","danger",true],["request_info","طلب استيضاح","ghost",true]); }
+  if (["in_progress","returned"].includes(t.status) && t.assignee === me){ A.push(["mark_done","تم التنفيذ","ok"],["request_info","طلب استيضاح","ghost",true]); }
+  if (["in_progress","returned"].includes(t.status) && isRouter(t.target_dept)) A.push(["route","إعادة توجيه","ghost"]);
+  if (t.status === "needs_info" && t.creator === me) A.push(["provide_info","رد على الاستيضاح","",true]);
+  if (t.status === "done" && t.creator === me) A.push(["confirm_close","تأكيد وقفل","ok"],["return_txn","رجّعها للمنفذ","danger",true]);
+  if (open && t.status !== "done" && (t.creator === me || S.me.role === "chairman")) A.push(["cancel_txn","إلغاء المعاملة","ghost",true]);
+  if (open && t.holder !== me && !waitingOnMe(t)) A.push(["remind","ذكّر "+(t.holder?empName(t.holder):"المسؤولين"),"warn"]);
+
+  const targetEmps = Object.values(S.emps).filter(e => e.active && e.dept === t.target_dept);
+  const x = t.extra || {};
+  const body = `
+    ${stepsFor(t)}
+    <div class="holder-big ${late?"late":!open&&t.status==="closed"?"ok":""}">
+      <div><div class="lbl">${open ? "المعاملة واقفة عند" : "الحالة"}</div><div class="nm">${esc(h.name)}</div><div class="lbl">${open ? esc(STATUS[t.status][0]) + (h.sub?" · "+esc(h.sub):"") : esc(h.sub)}</div></div>
+      ${open ? `<div class="days"><b>${days}</b>يوم</div>` : ""}
+    </div>
+    ${A.length ? `<div class="box"><h3>الإجراء المطلوب</h3>
+      <div class="actions">${A.map(a => `<button class="btn ${a[2]}" data-act="${a[0]}" data-note="${a[3]?1:0}">${esc(a[1])}</button>`).join("")}</div>
+      <div id="act-form" class="hide">
+        <div id="route-w" class="hide"><label for="act-emp">الموظف</label><select id="act-emp">${targetEmps.map(e => `<option value="${e.code}">${esc(e.name)} — ${esc(e.title||"")}</option>`).join("")}</select></div>
+        <label for="act-note" id="act-note-l">ملاحظة</label><textarea id="act-note"></textarea>
+        <div class="actions" style="margin-top:10px"><button class="btn" id="act-go">تأكيد</button><button class="btn ghost" id="act-cancel" type="button">رجوع</button></div>
+      </div>
+      <div class="err" id="act-err"></div></div>` : ""}
+    <div class="box"><h3>البيانات</h3>
+      <dl class="kv">
+        <dt>النوع</dt><dd>${esc(ty.name||t.type_code)}</dd>
+        <dt>المنشئ</dt><dd>${esc(empName(t.creator))} (${esc(t.creator)}) — ${esc(deptName(t.creator_dept))}</dd>
+        ${t.approver?`<dt>الموافقة</dt><dd>${esc(empName(t.approver))}</dd>`:""}
+        <dt>الإدارة المنفذة</dt><dd>${esc(deptName(t.target_dept))}</dd>
+        <dt>المنفذ</dt><dd>${t.assignee?esc(empName(t.assignee))+" ("+esc(t.assignee)+")":"لسه ما اتحددش"}</dd>
+        ${x.from_wh?`<dt>من مستودع</dt><dd>${esc(x.from_wh)}</dd>`:""}
+        ${x.to_wh?`<dt>إلى مستودع</dt><dd>${esc(x.to_wh)}</dd>`:""}
+        <dt>الأولوية</dt><dd>${PRIORITY[t.priority]}</dd>
+        <dt>الاستحقاق</dt><dd>${t.due_date?fmtDate(t.due_date):"—"}${late?' <span class="chip late">متأخرة</span>':""}</dd>
+        <dt>اتنشأت</dt><dd>${fmtDT(t.created_at)}</dd>
+      </dl>
+      ${t.details?`<p class="desc">${esc(t.details)}</p>`:""}
+    </div>
+    <div class="box"><h3>السجل والتعليقات</h3>
+      <ul class="timeline">${ev.map(e => `<li><b>${esc(empName(e.actor))}</b> ${esc(ACTION[e.action]||e.action)} <span class="when">${fmtDT(e.created_at)}</span>${e.note?`<div class="note">${esc(e.note)}</div>`:""}</li>`).join("")}</ul>
+      <label for="c-note">تعليق</label><textarea id="c-note" placeholder="اكتب تعليق يوصل للمنشئ واللي ماسك المعاملة"></textarea>
+      <button class="btn ghost" id="c-go" style="margin-top:8px">إضافة تعليق</button>
+    </div>`;
+
+  panel(`معاملة #${t.id} — ${t.title}`, body, () => {
+    let cur = null;
+    document.querySelectorAll("[data-act]").forEach(b => b.onclick = async () => {
+      const act = b.dataset.act;
+      if (act === "remind") return run("remind", { p_id: id }, "اتبعت التذكير");
+      if (act === "approve_txn" || act === "mark_done" || act === "confirm_close" || act === "route" || b.dataset.note === "1"){
+        cur = act;
+        $("#act-form").classList.remove("hide");
+        $("#route-w").classList.toggle("hide", act !== "route");
+        $("#act-note-l").textContent = b.dataset.note === "1" ? "السبب / التوضيح (مطلوب)" : "ملاحظة (اختياري)";
+        $("#act-go").textContent = b.textContent;
+        $("#act-note").focus();
+      }
+    });
+    const cancelBtn = $("#act-cancel"); if (cancelBtn) cancelBtn.onclick = () => $("#act-form").classList.add("hide");
+    const go = $("#act-go");
+    if (go) go.onclick = () => {
+      const note = $("#act-note").value;
+      if (cur === "route") return run("route_txn", { p_id: id, p_assignee: $("#act-emp").value, p_note: note }, "اتوجهت المعاملة");
+      return run(cur, { p_id: id, p_note: note }, "تم");
+    };
+    $("#c-go").onclick = () => run("add_comment", { p_id: id, p_note: $("#c-note").value }, "اتضاف التعليق");
+
+    async function run(fn, args, msg){
+      const err = $("#act-err");
+      if (err) err.textContent = "";
+      try { await rpc(fn, args); toast(msg); await refresh(); openTxn(id); }
+      catch (e) { if (err) err.textContent = errText(e); else toast(errText(e), true); }
+    }
+  });
+  // علّم تنبيهات المعاملة دي كمقروءة
+  const ids = S.notifs.filter(n => n.txn_id === id && !n.is_read).map(n => n.id);
+  if (ids.length) { rpc("mark_notifications_read", { p_ids: ids }).then(() => refresh(true)); }
+}
+
+/* ---------- التنبيهات ---------- */
+$("#b-notif").onclick = () => {
+  const body = (S.notifs.length ? S.notifs.map(n => `<button class="notif ${n.is_read?"":"unread"}" data-id="${n.txn_id||""}">${esc(n.body)}<span class="when">${fmtDT(n.created_at)}</span></button>`).join("")
+    : `<div class="empty">مفيش تنبيهات</div>`) +
+    (S.notifs.some(n => !n.is_read) ? `<button class="btn ghost" id="n-all" style="margin-top:8px">علّم الكل كمقروء</button>` : "");
+  panel("التنبيهات", body, close => {
+    document.querySelectorAll(".notif").forEach(b => b.onclick = () => { if (b.dataset.id) { close(); openTxn(+b.dataset.id); } });
+    const all = $("#n-all"); if (all) all.onclick = async () => { await rpc("mark_notifications_read", { p_ids: null }); await refresh(); close(); };
+  });
+};
+
+document.addEventListener("visibilitychange", () => { if (!document.hidden && S.me && !S.me.must_change_password) refresh(true); });
+
+if (C.SUPABASE_URL.includes("YOUR-PROJECT")) {
+  show("v-login"); $("#e-login").textContent = "لسه ما اتحطش رابط Supabase في config.js";
+} else {
+  boot().catch(e => { show("v-login"); $("#e-login").textContent = errText(e); });
+}
+})();
+</script>
+</body>
+</html>
