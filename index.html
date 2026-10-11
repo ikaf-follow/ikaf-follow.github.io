@@ -142,6 +142,15 @@ table.t th{background:#F8F9FA;color:var(--ink-2);font-weight:600;font-size:13px}
 .bar{height:8px;background:var(--line);border-radius:4px;overflow:hidden;min-width:60px}
 .bar i{display:block;height:100%;background:var(--indigo)}
 
+.welcome-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.att{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);font-size:14px}
+.att:last-child{border-bottom:0}
+.att button{background:none;border:0;color:var(--indigo);cursor:pointer;text-decoration:underline;padding:0;font:inherit;text-align:right}
+.att .sz{color:var(--ink-3);font-size:12px;margin-inline-start:auto}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:0;background:#fff;padding:8px 12px;cursor:pointer;color:var(--ink-2)}
+.seg button.on{background:var(--indigo);color:#fff}
+.deleg-note{background:var(--wait-soft);color:var(--wait);border-radius:8px;padding:8px 12px;font-size:14px;margin-bottom:12px}
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:8px;z-index:60;font-size:14px;max-width:90vw}
 .toast.bad{background:var(--late)}
 
@@ -151,6 +160,7 @@ table.t th{background:#F8F9FA;color:var(--ink-2);font-weight:600;font-size:13px}
   .stats{grid-template-columns:1fr 1fr}
   .grid2{grid-template-columns:1fr}
   .who{display:none}
+  .brand span{display:none}
   .step{font-size:11px}
   .panel{max-width:none}
 }
@@ -199,6 +209,7 @@ table.t th{background:#F8F9FA;color:var(--ink-2);font-weight:600;font-size:13px}
       <div class="brand"><img src="logo-mark.png" alt="إكاف"><span>متابعة المعاملات</span></div>
       <div class="spacer"></div>
       <div class="who" id="who"></div>
+      <button class="icon-btn" id="b-deleg" aria-label="الإنابة" title="الإنابة">الإنابة</button>
       <button class="icon-btn" id="b-notif" aria-label="التنبيهات">🔔<span class="badge hide" id="n-badge"></span></button>
       <button class="icon-btn" id="b-logout">خروج</button>
     </div>
@@ -237,10 +248,11 @@ const ACTION = {
   create:"أنشأ المعاملة", approve:"وافق", reject:"رفض", to_routing:"اتحولت لسلاسل التوجيه",
   to_assignee:"اتحولت للمنفذ", route:"وجّهها", reassign:"أعاد التوجيه", request_info:"طلب استيضاح",
   provide_info:"رد على الاستيضاح", done:"ضغط تم التنفيذ", close:"أكد وقفل المعاملة",
-  return:"رجّعها للمنفذ", cancel:"ألغاها", comment:"علّق", remind:"بعت تذكير ⏰"
+  return:"رجّعها للمنفذ", cancel:"ألغاها", comment:"علّق", remind:"بعت تذكير ⏰",
+  escalate:"⚠️ تصعيد تلقائي", attach:"أضاف مرفق 📎"
 };
 
-let S = { me:null, emps:{}, depts:{}, types:{}, txns:[], notifs:[], tab:"mine", filter:{q:"",st:"open",dept:""} };
+let S = { ids:new Set(), idents:[], seenNotif:null, welcomed:false, rep:"week", me:null, emps:{}, depts:{}, types:{}, txns:[], notifs:[], tab:"mine", filter:{q:"",st:"open",dept:""} };
 
 /* ---------- أدوات ---------- */
 const fmtDate = d => d ? new Date(d).toLocaleDateString("ar-EG-u-nu-latn",{day:"numeric",month:"short"}) : "";
@@ -248,9 +260,10 @@ const fmtDT = d => new Date(d).toLocaleString("ar-EG-u-nu-latn",{day:"numeric",m
 const daysSince = d => Math.floor((Date.now() - new Date(d)) / 86400000);
 const today = () => { const t = new Date(); t.setHours(0,0,0,0); return t; };
 const isLate = t => OPEN(t.status) && t.status !== "done" && t.due_date && new Date(t.due_date + "T00:00:00") < today();
-const empName = c => c ? (S.emps[c]?.name || c) : "";
+const empName = c => c ? (S.emps[c]?.name || c) : "النظام";
 const deptName = c => c ? (S.depts[c]?.name || c) : "";
-const isRouter = dept => S.me.role === "chairman" || (["manager","deputy"].includes(S.me.role) && S.me.dept === dept);
+const isRouter = dept => S.idents.some(i => i.role === "chairman" || (["manager","deputy"].includes(i.role) && i.dept === dept));
+const mine = c => !!c && S.ids.has(c);
 const isBoss = () => ["manager","deputy","chairman"].includes(S.me.role);
 
 function toast(msg, bad){
@@ -283,7 +296,7 @@ function rowClass(t){
 }
 function waitingOnMe(t){
   if (!OPEN(t.status)) return false;
-  if (t.holder === S.me.code) return true;
+  if (mine(t.holder)) return true;
   return !t.holder && t.status === "pending_routing" && isRouter(t.holder_dept);
 }
 
@@ -332,12 +345,47 @@ async function boot(){
   S.emps = Object.fromEntries((emps.data||[]).map(x => [x.code, x]));
   S.depts = Object.fromEntries((depts.data||[]).map(x => [x.code, x]));
   S.types = Object.fromEntries((types.data||[]).map(x => [x.code, x]));
+  await loadIdentities();
   $("#who").innerHTML = `${esc(me.name)} — ${esc(me.code)}<br>${esc(me.title||"")} · ${esc(deptName(me.dept))}`;
   show("v-app");
   await refresh();
-  if (!S.poll) S.poll = setInterval(() => { if (!document.hidden) refresh(true); }, 45000);
+  if (!S.poll) S.poll = setInterval(() => refresh(true), 30000);
   const id = new URLSearchParams(location.hash.slice(1)).get("t");
-  if (id) openTxn(+id);
+  if (id) openTxn(+id); else showWelcome();
+}
+
+async function loadIdentities(){
+  const r = await sb.rpc("my_identities");
+  S.idents = (r.data && r.data.length) ? r.data : [S.me];
+  S.ids = new Set(S.idents.map(i => i.code));
+}
+
+/* ---------- ترحيب أول ما يفتح ---------- */
+function showWelcome(){
+  let seen = false;
+  try { seen = sessionStorage.getItem("ikaf-welcomed") === "1"; sessionStorage.setItem("ikaf-welcomed","1"); } catch(e) {}
+  if (seen || S.welcomed) return; S.welcomed = true;
+  const wait = S.txns.filter(waitingOnMe).sort((a,b) => new Date(a.holder_since) - new Date(b.holder_since));
+  const unread = S.notifs.filter(x => !x.is_read).length;
+  if (!wait.length && !unread) return;
+  const late = wait.filter(t => isLate(t) || t.escalation_level > 0).length;
+  const others = S.idents.filter(i => i.code !== S.me.code);
+  const body = `${others.length?`<div class="deleg-note">إنت بتنوب النهارده عن: ${others.map(i=>esc(i.name)).join("، ")} — معاملاتهم ظاهرة عندك في «مستنياك»</div>`:""}
+    <div class="welcome-stats">
+      <div class="stat"><b>${wait.length}</b><span>مستنياك</span></div>
+      <div class="stat late"><b>${late}</b><span>متأخرة أو متصعّدة</span></div>
+      <div class="stat wait"><b>${unread}</b><span>تنبيه جديد</span></div>
+    </div>
+    ${wait.length ? listView(wait.slice(0,5), "") : ""}
+    <div class="actions" style="margin-top:12px">
+      ${wait.length ? `<button class="btn" id="w-mine">اعرض كل اللي مستنياك</button>` : ""}
+      ${unread ? `<button class="btn ghost" id="w-notif">اعرض التنبيهات</button>` : ""}
+    </div>`;
+  panel("أهلًا " + S.me.name, body, close => {
+    document.querySelectorAll("#layer .row").forEach(r => r.onclick = () => { close(); openTxn(+r.dataset.id); });
+    const a = $("#w-mine"); if (a) a.onclick = () => { close(); S.tab = "mine"; render(); };
+    const b = $("#w-notif"); if (b) b.onclick = () => { close(); $("#b-notif").click(); };
+  });
 }
 
 async function refresh(silent){
@@ -349,6 +397,21 @@ async function refresh(silent){
   S.txns = t.data || []; S.notifs = n.data || [];
   const unread = S.notifs.filter(x => !x.is_read).length;
   $("#n-badge").textContent = unread; $("#n-badge").classList.toggle("hide", !unread);
+  const waitN = S.txns.filter(waitingOnMe).length;
+  document.title = (waitN ? `(${waitN}) ` : "") + "متابعة المعاملات — إكاف";
+  const unreadIds = S.notifs.filter(x => !x.is_read).map(x => x.id);
+  if (S.seenNotif) {
+    const fresh = S.notifs.filter(x => !x.is_read && !S.seenNotif.has(x.id));
+    if (fresh.length && "Notification" in window && Notification.permission === "granted") {
+      fresh.slice(0,3).forEach(x => {
+        try {
+          const n = new Notification("متابعة المعاملات — إكاف", { body: x.body, icon: "favicon.png", tag: "ikaf-" + x.id });
+          n.onclick = () => { window.focus(); if (x.txn_id) openTxn(x.txn_id); n.close(); };
+        } catch(e) {}
+      });
+    }
+  }
+  S.seenNotif = new Set([...(S.seenNotif || []), ...unreadIds]);
   render();
 }
 
@@ -357,6 +420,7 @@ function tabs(){
   const mine = S.txns.filter(waitingOnMe).length;
   const list = [["mine","مستنياك", mine],["created","أنشأتها"],["all","كل المعاملات"]];
   if (isBoss()) list.push(["board","لوحة المتابعة"]);
+  if (S.me.role === "chairman") list.push(["report","التقرير الأسبوعي"]);
   $("#tabs").innerHTML = list.map(([k,l,c]) =>
     `<button class="${S.tab===k?"on":""}" data-tab="${k}">${l}${c!=null?`<span class="count">${c}</span>`:""}</button>`).join("");
   $("#tabs").querySelectorAll("button").forEach(b => b.onclick = () => { S.tab = b.dataset.tab; render(); });
@@ -369,7 +433,7 @@ function rowHTML(t){
     <div>
       <div class="t">#${t.id} — ${esc(t.title)}</div>
       <div class="meta">
-        <span class="chip ${st[1]}">${st[0]}</span>${late?`<span class="chip late">متأخرة</span>`:""}${t.priority!=="normal"?`<span class="chip late">${PRIORITY[t.priority]}</span>`:""}
+        <span class="chip ${st[1]}">${st[0]}</span>${late?`<span class="chip late">متأخرة</span>`:""}${OPEN(t.status)&&t.escalation_level>0?`<span class="chip late">⚠️ متصعّدة</span>`:""}${OPEN(t.status)&&t.holder&&mine(t.holder)&&t.holder!==S.me.code?`<span class="chip wait">نيابة عن ${esc(empName(t.holder))}</span>`:""}${t.priority!=="normal"?`<span class="chip late">${PRIORITY[t.priority]}</span>`:""}
         ${esc(S.types[t.type_code]?.name||t.type_code)} · من ${esc(empName(t.creator))}${t.due_date?` · الاستحقاق ${fmtDate(t.due_date)}`:""}
       </div>
     </div>
@@ -409,14 +473,21 @@ function render(){
           <option value="closed">المقفولة</option><option value="all">الكل</option>
         </select>
         <select id="fd"><option value="">كل الإدارات</option>${Object.values(S.depts).map(d=>`<option value="${d.code}">${esc(d.name)}</option>`).join("")}</select>
+        <button class="btn ghost" id="b-xls">تصدير إكسل</button>
         ${newBtn}
       </div>` + listView(items, "مفيش معاملات بالفلتر ده.");
+    S.lastList = items;
     $("#fs").value = f.st; $("#fd").value = f.dept;
     $("#q").oninput = e => { f.q = e.target.value; const p = e.target.selectionStart; render(); $("#q").focus(); $("#q").setSelectionRange(p,p); };
     $("#fs").onchange = e => { f.st = e.target.value; render(); };
     $("#fd").onchange = e => { f.dept = e.target.value; render(); };
+    $("#b-xls").onclick = () => exportXlsx([{ name: "المعاملات", rows: txnRows(S.lastList) }], "معاملات-إكاف");
   } else if (S.tab === "board"){
     main.innerHTML = boardHTML();
+  } else if (S.tab === "report"){
+    main.innerHTML = reportHTML();
+    main.querySelectorAll("[data-rep]").forEach(b => b.onclick = () => { S.rep = b.dataset.rep; render(); });
+    $("#b-rep-xls").onclick = () => exportXlsx(S.repSheets, "تقرير-إكاف-" + S.repLabel);
   }
   main.querySelectorAll(".row").forEach(r => r.onclick = () => openTxn(+r.dataset.id));
   const nb = $("#b-new"); if (nb) nb.onclick = openNew;
@@ -450,6 +521,133 @@ function boardHTML(){
     </div>
     ${oldest.length ? `<h3 style="font-size:14px;color:var(--ink-2);margin:18px 0 8px">أقدم المعاملات اللي لسه مفتوحة</h3>${listView(oldest, "")}` : ""}`;
 }
+
+/* ---------- التقرير الأسبوعي (رئيس مجلس الإدارة) ---------- */
+function repRange(){
+  const now = new Date(), d0 = today();
+  const sun = new Date(d0); sun.setDate(d0.getDate() - d0.getDay());   // بداية الأسبوع: الأحد
+  if (S.rep === "last") { const a = new Date(sun); a.setDate(sun.getDate() - 7); return [a, sun, "الأسبوع اللي فات"]; }
+  if (S.rep === "30") { const a = new Date(d0); a.setDate(d0.getDate() - 30); return [a, now, "آخر 30 يوم"]; }
+  return [sun, now, "الأسبوع ده"];
+}
+function reportHTML(){
+  const [from, to, label] = repRange();
+  const inR = d => d && new Date(d) >= from && new Date(d) < to;
+  const created = S.txns.filter(t => inR(t.created_at));
+  const closed = S.txns.filter(t => t.status === "closed" && inR(t.closed_at));
+  const open = S.txns.filter(t => OPEN(t.status));
+  const late = open.filter(t => isLate(t) || t.escalation_level > 0);
+  const avgDays = arr => arr.length ? (arr.reduce((s,t) => s + (new Date(t.closed_at) - new Date(t.created_at)), 0) / arr.length / 86400000) : null;
+  const fmt = v => v == null ? "—" : v.toFixed(1);
+  const depts = Object.values(S.depts);
+  const drows = depts.map(d => {
+    const cl = closed.filter(t => t.target_dept === d.code);
+    const op = open.filter(t => t.holder_dept === d.code);
+    return { d, inn: created.filter(t => t.target_dept === d.code).length, out: created.filter(t => t.creator_dept === d.code).length,
+             cl: cl.length, avg: avgDays(cl), open: op.length, late: op.filter(t => isLate(t)).length,
+             esc: op.filter(t => t.escalation_level > 0).length };
+  }).filter(r => r.inn || r.out || r.cl || r.open);
+  const people = {};
+  open.filter(t => t.holder).forEach(t => {
+    const p = people[t.holder] = people[t.holder] || { n:0, late:0, age:0 };
+    p.n++; if (isLate(t) || t.escalation_level > 0) p.late++; p.age = Math.max(p.age, daysSince(t.holder_since));
+  });
+  const prow = Object.entries(people).sort((a,b) => b[1].n - a[1].n || b[1].age - a[1].age).slice(0, 10);
+  S.repLabel = label.replace(/ /g, "-");
+  S.repSheets = [
+    { name: "حسب الإدارة", rows: [["الإدارة","طلبات واردة","طلبات صادرة","اتقفلت","متوسط أيام القفل","مفتوحة عندها","متأخرة","متصعّدة"],
+        ...drows.map(r => [r.d.name, r.inn, r.out, r.cl, r.avg==null?"":+r.avg.toFixed(1), r.open, r.late, r.esc])] },
+    { name: "حسب الموظف", rows: [["الموظف","الإدارة","مفتوحة عنده","متأخرة/متصعّدة","أقدم واحدة (يوم)"],
+        ...prow.map(([c,p]) => [empName(c), deptName(S.emps[c]?.dept), p.n, p.late, p.age])] },
+    { name: "المفتوحة", rows: txnRows(open) }
+  ];
+  const seg = [["week","الأسبوع ده"],["last","الأسبوع اللي فات"],["30","آخر 30 يوم"]];
+  return `<div class="toolbar"><div class="seg">${seg.map(([k,l]) => `<button data-rep="${k}" class="${S.rep===k?"on":""}">${l}</button>`).join("")}</div>
+      <div class="spacer"></div><button class="btn ghost" id="b-rep-xls">تصدير إكسل</button></div>
+    <div class="stats">
+      <div class="stat"><b>${created.length}</b><span>معاملة اتعملت — ${label}</span></div>
+      <div class="stat"><b>${closed.length}</b><span>اتقفلت — ${label}</span></div>
+      <div class="stat late"><b>${late.length}</b><span>مفتوحة متأخرة أو متصعّدة دلوقتي</span></div>
+      <div class="stat"><b>${fmt(avgDays(closed))}</b><span>متوسط أيام القفل</span></div>
+    </div>
+    <div class="box"><h3>حسب الإدارة</h3>
+      <table class="t"><thead><tr><th>الإدارة</th><th>واردة</th><th>صادرة</th><th>اتقفلت</th><th>متوسط القفل (يوم)</th><th>مفتوحة عندها</th><th>متأخرة</th><th>متصعّدة</th></tr></thead><tbody>
+      ${drows.map(r => `<tr><td>${esc(r.d.name)}</td><td>${r.inn}</td><td>${r.out}</td><td>${r.cl}</td><td>${fmt(r.avg)}</td><td>${r.open}</td><td>${r.late}</td><td>${r.esc}</td></tr>`).join("") || `<tr><td colspan="8">مفيش حركة في الفترة دي</td></tr>`}
+      </tbody></table>
+      <p class="hint">واردة = اتطلبت من الإدارة · صادرة = الإدارة طلبتها · مفتوحة عندها = واقفة عند حد في الإدارة دلوقتي</p>
+    </div>
+    <div class="box"><h3>المعاملات المفتوحة واقفة عند مين</h3>
+      <table class="t"><thead><tr><th>الموظف</th><th>الإدارة</th><th>مفتوحة عنده</th><th>متأخرة/متصعّدة</th><th>أقدم واحدة</th></tr></thead><tbody>
+      ${prow.map(([c,p]) => `<tr><td>${esc(empName(c))}</td><td>${esc(deptName(S.emps[c]?.dept))}</td><td>${p.n}</td><td>${p.late}</td><td>${p.age} يوم</td></tr>`).join("") || `<tr><td colspan="5">مفيش معاملات مفتوحة</td></tr>`}
+      </tbody></table>
+    </div>`;
+}
+
+/* ---------- تصدير إكسل ---------- */
+function txnRows(list){
+  return [["رقم","العنوان","النوع","الحالة","المنشئ","الإدارة الطالبة","الإدارة المنفذة","المنفذ","واقفة عند","من (يوم)","الأولوية","الاستحقاق","متأخرة","متصعّدة","تاريخ الإنشاء","تاريخ القفل"],
+    ...list.map(t => [t.id, t.title, S.types[t.type_code]?.name || t.type_code, STATUS[t.status][0], empName(t.creator),
+      deptName(t.creator_dept), deptName(t.target_dept), t.assignee ? empName(t.assignee) : "",
+      OPEN(t.status) ? holderLabel(t).name : "", OPEN(t.status) ? daysSince(t.holder_since) : "",
+      PRIORITY[t.priority], t.due_date || "", isLate(t) ? "نعم" : "", OPEN(t.status) && t.escalation_level > 0 ? "نعم" : "",
+      (t.created_at || "").slice(0,10), (t.closed_at || "").slice(0,10)])];
+}
+function loadXlsx(){
+  if (window.XLSX) return Promise.resolve();
+  return new Promise((ok, bad) => {
+    const s = document.createElement("script");
+    s.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+    s.onload = ok; s.onerror = () => bad(new Error("مقدرتش أحمّل أداة الإكسل — جرب تاني"));
+    document.head.appendChild(s);
+  });
+}
+async function exportXlsx(sheets, fname){
+  try {
+    await loadXlsx();
+    const wb = XLSX.utils.book_new();
+    wb.Workbook = { Views: [{ RTL: true }] };
+    sheets.forEach(sh => {
+      const ws = XLSX.utils.aoa_to_sheet(sh.rows);
+      ws["!cols"] = sh.rows[0].map((_, i) => ({ wch: Math.min(40, Math.max(8, ...sh.rows.map(r => String(r[i] ?? "").length + 2))) }));
+      XLSX.utils.book_append_sheet(wb, ws, sh.name.slice(0, 31));
+    });
+    XLSX.writeFile(wb, `${fname}-${new Date().toISOString().slice(0,10)}.xlsx`);
+  } catch (e) { toast(errText(e), true); }
+}
+
+/* ---------- الإنابة ---------- */
+$("#b-deleg").onclick = async () => {
+  const d = (await sb.from("delegations").select("*").eq("active", true).order("id", { ascending: false })).data || [];
+  const td = new Date().toISOString().slice(0,10);
+  const mineOut = d.find(x => x.employee === S.me.code && x.end_date >= td);
+  const incoming = d.filter(x => x.delegate === S.me.code && x.end_date >= td);
+  const cands = Object.values(S.emps).filter(e => e.active && e.code !== S.me.code && (S.me.role === "chairman" || e.dept === S.me.dept));
+  const body = `
+    ${incoming.length ? `<div class="box"><h3>إنت بتنوب عن</h3>${incoming.map(x => `<p>${esc(empName(x.employee))} — من ${x.start_date} لحد ${x.end_date}</p>`).join("")}
+      <p class="hint">معاملاتهم بتظهر عندك في «مستنياك»، وأي إجراء تعمله بيتسجل باسمك «نيابة عنهم».</p></div>` : ""}
+    <div class="box"><h3>لو هتغيب: مين ينوب عنك</h3>
+      ${mineOut ? `<div class="deleg-note">${esc(empName(mineOut.delegate))} بينوب عنك من ${mineOut.start_date} لحد ${mineOut.end_date}</div>
+        <button class="btn danger" id="d-cancel">إلغاء الإنابة</button><p class="hint">أو اختار نائب أو تواريخ جديدة تحت:</p>` : ""}
+      <label for="d-emp">النائب</label>
+      <select id="d-emp">${cands.map(e => `<option value="${e.code}">${esc(e.name)} — ${esc(e.title||"")}</option>`).join("")}</select>
+      <div class="grid2">
+        <div><label for="d-from">من يوم</label><input id="d-from" type="date" value="${td}"></div>
+        <div><label for="d-to">لحد يوم</label><input id="d-to" type="date"></div>
+      </div>
+      <button class="btn block" id="d-go">حفظ الإنابة</button>
+      <p class="hint">طول مدة الإنابة، النائب بيشوف معاملاتك ويقدر يوافق أو ينفذ أو يقفل بالنيابة عنك، وبيوصله نسخة من تنبيهاتك.</p>
+      <div class="err" id="d-err"></div>
+    </div>`;
+  panel("الإنابة", body, close => {
+    const c = $("#d-cancel"); if (c) c.onclick = async () => { try { await rpc("cancel_delegation"); toast("اتلغت الإنابة"); close(); } catch(e) { $("#d-err").textContent = errText(e); } };
+    $("#d-go").onclick = async () => {
+      try {
+        await rpc("set_delegation", { p_delegate: $("#d-emp").value, p_start: $("#d-from").value || null, p_end: $("#d-to").value || null });
+        toast("اتحفظت الإنابة"); close();
+      } catch(e) { $("#d-err").textContent = errText(e); }
+    };
+  });
+};
 
 /* ---------- لوحة جانبية ---------- */
 function panel(title, body, onReady){
@@ -545,20 +743,21 @@ async function openTxn(id){
   if (!t) { toast("المعاملة مش موجودة أو مش مسموح لك تشوفها", true); return; }
   history.replaceState(null, "", "#t=" + id);
   const ev = (await sb.from("txn_events").select("*").eq("txn_id", id).order("id")).data || [];
-  const h = holderLabel(t), late = isLate(t), days = daysSince(t.holder_since), me = S.me.code;
+  const h = holderLabel(t), late = isLate(t), days = daysSince(t.holder_since);
+  const att = (await sb.from("txn_attachments").select("*").eq("txn_id", id).order("id")).data || [];
   const ty = S.types[t.type_code] || {};
 
   // الإجراءات المتاحة
   const A = [];
   const open = OPEN(t.status);
-  if (t.status === "pending_approval" && t.holder === me){ A.push(["approve_txn","موافقة","ok"],["reject_txn","رفض","danger",true],["request_info","طلب استيضاح","ghost",true]); }
+  if (t.status === "pending_approval" && mine(t.holder)){ A.push(["approve_txn","موافقة","ok"],["reject_txn","رفض","danger",true],["request_info","طلب استيضاح","ghost",true]); }
   if (t.status === "pending_routing" && isRouter(t.target_dept)){ A.push(["route","توجيه لموظف",""],["reject_txn","رفض","danger",true],["request_info","طلب استيضاح","ghost",true]); }
-  if (["in_progress","returned"].includes(t.status) && t.assignee === me){ A.push(["mark_done","تم التنفيذ","ok"],["request_info","طلب استيضاح","ghost",true]); }
+  if (["in_progress","returned"].includes(t.status) && mine(t.assignee)){ A.push(["mark_done","تم التنفيذ","ok"],["request_info","طلب استيضاح","ghost",true]); }
   if (["in_progress","returned"].includes(t.status) && isRouter(t.target_dept)) A.push(["route","إعادة توجيه","ghost"]);
-  if (t.status === "needs_info" && t.creator === me) A.push(["provide_info","رد على الاستيضاح","",true]);
-  if (t.status === "done" && t.creator === me) A.push(["confirm_close","تأكيد وقفل","ok"],["return_txn","رجّعها للمنفذ","danger",true]);
-  if (open && t.status !== "done" && (t.creator === me || S.me.role === "chairman")) A.push(["cancel_txn","إلغاء المعاملة","ghost",true]);
-  if (open && t.holder !== me && !waitingOnMe(t)) A.push(["remind","ذكّر "+(t.holder?empName(t.holder):"المسؤولين"),"warn"]);
+  if (t.status === "needs_info" && mine(t.creator)) A.push(["provide_info","رد على الاستيضاح","",true]);
+  if (t.status === "done" && mine(t.creator)) A.push(["confirm_close","تأكيد وقفل","ok"],["return_txn","رجّعها للمنفذ","danger",true]);
+  if (open && t.status !== "done" && (mine(t.creator) || S.idents.some(i => i.role === "chairman"))) A.push(["cancel_txn","إلغاء المعاملة","ghost",true]);
+  if (open && !mine(t.holder) && !waitingOnMe(t)) A.push(["remind","ذكّر "+(t.holder?empName(t.holder):"المسؤولين"),"warn"]);
 
   const targetEmps = Object.values(S.emps).filter(e => e.active && e.dept === t.target_dept);
   const x = t.extra || {};
@@ -568,6 +767,8 @@ async function openTxn(id){
       <div><div class="lbl">${open ? "المعاملة واقفة عند" : "الحالة"}</div><div class="nm">${esc(h.name)}</div><div class="lbl">${open ? esc(STATUS[t.status][0]) + (h.sub?" · "+esc(h.sub):"") : esc(h.sub)}</div></div>
       ${open ? `<div class="days"><b>${days}</b>يوم</div>` : ""}
     </div>
+    ${open && t.escalation_level > 0 ? `<div class="deleg-note">⚠️ المعاملة دي اتصعّدت ${t.escalation_level > 1 ? "لرئيس مجلس الإدارة" : "لمدير الإدارة"} عشان اتأخرت</div>` : ""}
+    ${open && t.holder && mine(t.holder) && t.holder !== S.me.code ? `<div class="deleg-note">المعاملة دي عند ${esc(empName(t.holder))} وإنت بتنوب عنه — أي إجراء هيتسجل باسمك نيابة عنه</div>` : ""}
     ${A.length ? `<div class="box"><h3>الإجراء المطلوب</h3>
       <div class="actions">${A.map(a => `<button class="btn ${a[2]}" data-act="${a[0]}" data-note="${a[3]?1:0}">${esc(a[1])}</button>`).join("")}</div>
       <div id="act-form" class="hide">
@@ -590,6 +791,12 @@ async function openTxn(id){
         <dt>اتنشأت</dt><dd>${fmtDT(t.created_at)}</dd>
       </dl>
       ${t.details?`<p class="desc">${esc(t.details)}</p>`:""}
+    </div>
+    <div class="box"><h3>المرفقات</h3>
+      ${att.length ? att.map(a => `<div class="att">📎 <button data-path="${esc(a.path)}">${esc(a.name)}</button><span class="sz">${esc(empName(a.uploaded_by))} · ${a.size_bytes ? (a.size_bytes/1024/1024 < 1 ? Math.ceil(a.size_bytes/1024)+" ك.ب" : (a.size_bytes/1024/1024).toFixed(1)+" م.ب") : ""}</span></div>`).join("") : `<p class="hint" style="margin:0 0 8px">مفيش مرفقات</p>`}
+      <label for="att-file" class="btn ghost" style="display:inline-block;margin-top:8px">+ إضافة مرفق</label>
+      <input id="att-file" type="file" class="hide" accept="image/*,.pdf,.xlsx,.xls,.docx,.doc,.csv,.txt">
+      <span class="hint" id="att-msg">صور، PDF، إكسل، وورد — لحد 10 ميجا</span>
     </div>
     <div class="box"><h3>السجل والتعليقات</h3>
       <ul class="timeline">${ev.map(e => `<li><b>${esc(empName(e.actor))}</b> ${esc(ACTION[e.action]||e.action)} <span class="when">${fmtDT(e.created_at)}</span>${e.note?`<div class="note">${esc(e.note)}</div>`:""}</li>`).join("")}</ul>
@@ -619,6 +826,21 @@ async function openTxn(id){
       return run(cur, { p_id: id, p_note: note }, "تم");
     };
     $("#c-go").onclick = () => run("add_comment", { p_id: id, p_note: $("#c-note").value }, "اتضاف التعليق");
+    document.querySelectorAll(".att [data-path]").forEach(b => b.onclick = async () => {
+      const { data, error } = await sb.storage.from("attachments").createSignedUrl(b.dataset.path, 600);
+      if (error) return toast(errText(error), true);
+      window.open(data.signedUrl, "_blank", "noopener");
+    });
+    $("#att-file").onchange = async e => {
+      const f = e.target.files[0]; if (!f) return;
+      if (f.size > 10 * 1024 * 1024) return toast("الملف أكبر من 10 ميجا", true);
+      const ext = (f.name.match(/\.([A-Za-z0-9]{1,6})$/) || [,"bin"])[1].toLowerCase();
+      const path = `${id}/${Date.now()}-${Math.random().toString(36).slice(2,8)}.${ext}`;
+      $("#att-msg").textContent = "جاري الرفع...";
+      const up = await sb.storage.from("attachments").upload(path, f, { contentType: f.type || "application/octet-stream", upsert: false });
+      if (up.error) { $("#att-msg").textContent = ""; return toast(errText(up.error), true); }
+      run("add_attachment", { p_id: id, p_path: path, p_name: f.name, p_size: f.size }, "اترفع المرفق");
+    };
 
     async function run(fn, args, msg){
       const err = $("#act-err");
@@ -636,10 +858,12 @@ async function openTxn(id){
 $("#b-notif").onclick = () => {
   const body = (S.notifs.length ? S.notifs.map(n => `<button class="notif ${n.is_read?"":"unread"}" data-id="${n.txn_id||""}">${esc(n.body)}<span class="when">${fmtDT(n.created_at)}</span></button>`).join("")
     : `<div class="empty">مفيش تنبيهات</div>`) +
-    (S.notifs.some(n => !n.is_read) ? `<button class="btn ghost" id="n-all" style="margin-top:8px">علّم الكل كمقروء</button>` : "");
+    (S.notifs.some(n => !n.is_read) ? `<button class="btn ghost" id="n-all" style="margin-top:8px">علّم الكل كمقروء</button>` : "") +
+    ("Notification" in window && Notification.permission === "default" ? `<div class="box" style="margin-top:12px"><h3>تنبيهات على الجهاز</h3><p class="hint">لو اللينك مفتوح ولو في تاب تاني، هيطلعلك تنبيه على الشاشة أول ما توصلك معاملة.</p><button class="btn" id="n-perm">فعّل تنبيهات المتصفح</button></div>` : "");
   panel("التنبيهات", body, close => {
     document.querySelectorAll(".notif").forEach(b => b.onclick = () => { if (b.dataset.id) { close(); openTxn(+b.dataset.id); } });
     const all = $("#n-all"); if (all) all.onclick = async () => { await rpc("mark_notifications_read", { p_ids: null }); await refresh(); close(); };
+    const pm = $("#n-perm"); if (pm) pm.onclick = async () => { try { const r = await Notification.requestPermission(); toast(r === "granted" ? "اتفعلت تنبيهات المتصفح" : "التنبيهات مش متفعلة", r !== "granted"); } catch(e) {} close(); };
   });
 };
 
